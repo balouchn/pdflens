@@ -1,0 +1,8 @@
+streamlit==1.24.0
+python-dotenv==1.0.0
+PyPDF2==1.26.0
+langchain==0.0.100
+langchain-community==0.0.8
+openai==0.27.0
+faiss-cpu==1.7.3
+Pillow>=6.2.0,<10.0.0
