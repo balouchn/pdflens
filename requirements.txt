@@ -5,4 +5,4 @@ langchain==0.0.100
 langchain-community==0.0.8
 openai==0.27.0
 faiss-cpu==1.7.4  
-Pillow==11.0.0 
+Pillow>=6.2.0,<10.0.0
