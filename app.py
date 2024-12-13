@@ -8,33 +8,39 @@ from langchain_community.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 import os
+import openai
 
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
 
-# Make sure to load the API key first
+# Fetch OpenAI API key from environment variables
 openai_api_key = os.getenv("OPENAI_API_KEY")
+
+# Check if the API key is loaded properly
+if not openai_api_key:
+    st.error("OPENAI_API_KEY is missing in the .env file.")
+    st.stop()  # Stop execution if API key is missing
+else:
+    openai.api_key = openai_api_key  # Set the API key globally for OpenAI API calls
 
 # Streamlit app starts here
 def main():
-    # Set page configuration as the first Streamlit command
+    # Set page configuration
     st.set_page_config(page_title="PDFLens", page_icon=":page_with_curl:")
 
     # Inject custom CSS for Crimson Red Theme
     st.markdown("""
         <style>
             body {
-                background-color: #DC143C; /* Crimson red background */
+                background-color: #DC143C;
                 color: white;
                 font-family: 'Poppins', sans-serif;
             }
-
             h1, h2, h3, h4, h5, h6 {
-                color: #ffffff; /* White text for headings */
+                color: #ffffff;
             }
-
             .stButton>button {
-                background-color: #8B0000; /* Dark crimson for buttons */
+                background-color: #8B0000;
                 color: white;
                 border: none;
                 padding: 10px 20px;
@@ -43,27 +49,22 @@ def main():
                 border-radius: 5px;
                 cursor: pointer;
             }
-
             .stButton>button:hover {
-                background-color: #A52A2A; /* Lighter crimson on hover */
+                background-color: #A52A2A;
             }
-
             .stTextInput input {
-                background-color: #8B0000; /* Crimson input field */
+                background-color: #8B0000;
                 color: white;
                 border-radius: 5px;
                 padding: 10px;
-                border: 2px solid #A52A2A; /* Darker crimson border */
+                border: 2px solid #A52A2A;
             }
-
             .stTextInput input:focus {
-                border-color: #DC143C; /* Focused input border */
+                border-color: #DC143C;
             }
-
             .stMarkdown {
-                color: white; /* White text for markdown */
+                color: white;
             }
-
             .chat-message {
                 margin-bottom: 10px;
                 padding: 10px;
@@ -72,24 +73,20 @@ def main():
                 color: white;
                 border: 1px solid #A52A2A;
             }
-
             .avatar img {
                 width: 50px;
                 height: 50px;
                 border-radius: 50%;
                 border: 2px solid #DC143C;
             }
-
             .message {
                 margin-left: 10px;
                 display: inline-block;
             }
-
             .chat-message.bot {
-                background-color: #800000;  /* Dark crimson for bot */
+                background-color: #800000;
                 border-color: #A52A2A;
             }
-
             .chat-message.user {
                 background-color: #A52A2A;
                 border-color: #800000;
@@ -102,11 +99,6 @@ def main():
         st.session_state.chat_history = []  # Initialize chat history
     if "conversation" not in st.session_state:
         st.session_state.conversation = None  # Initialize conversation chain
-
-    # Check if the API key is loaded properly
-    if not openai_api_key:
-        st.error("OPENAI_API_KEY is missing in the .env file.")
-        return
 
     # PDF Text Extraction Function
     def get_pdf_text(pdf_docs):
@@ -130,21 +122,29 @@ def main():
 
     # Vector Store Setup
     def get_vectorstore(text_chunks):
-        embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)  # Ensure API key is passed here
-        vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
-        return vectorstore
+        try:
+            embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)  # Ensure API key is passed here
+            vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
+            return vectorstore
+        except Exception as e:
+            st.error(f"Error while setting up vectorstore: {e}")
+            return None
 
     # Conversation Chain Setup
     def get_conversation_chain(vectorstore):
-        llm = ChatOpenAI(openai_api_key=openai_api_key)  # Ensure API key is passed here
-        memory = ConversationBufferMemory(
-            memory_key='chat_history', return_messages=True)
-        conversation_chain = ConversationalRetrievalChain.from_llm(
-            llm=llm,
-            retriever=vectorstore.as_retriever(),
-            memory=memory
-        )
-        return conversation_chain
+        try:
+            llm = ChatOpenAI(openai_api_key=openai_api_key)  # Ensure API key is passed here
+            memory = ConversationBufferMemory(
+                memory_key='chat_history', return_messages=True)
+            conversation_chain = ConversationalRetrievalChain.from_llm(
+                llm=llm,
+                retriever=vectorstore.as_retriever(),
+                memory=memory
+            )
+            return conversation_chain
+        except Exception as e:
+            st.error(f"Error while setting up conversation chain: {e}")
+            return None
 
     # Handle User Input and Conversation
     def handle_userinput(user_question, conversation):
@@ -167,12 +167,15 @@ def main():
 
     if process_button:
         # Only process when the button is clicked
-        if pdf_docs:
+        if pdf_docs and st.session_state.vectorstore:
             # Get the conversation chain once PDFs are processed
             conversation_chain = get_conversation_chain(st.session_state.vectorstore)
-            st.session_state.conversation = conversation_chain
-            st.session_state.chat_history = []  # Reset chat history when processing starts
-            st.success("PDF processed, conversation ready!")
+            if conversation_chain:
+                st.session_state.conversation = conversation_chain
+                st.session_state.chat_history = []  # Reset chat history when processing starts
+                st.success("PDF processed, conversation ready!")
+            else:
+                st.error("Failed to set up conversation chain.")
         else:
             st.error("Please upload PDFs first.")
 
@@ -190,3 +193,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
